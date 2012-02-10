@@ -1,0 +1,6 @@
+An implementation in C of the Sobel edge detection operator on image files.  Written for my CprE 584 class.
+
+Start with this link:
+http://en.wikipedia.org/wiki/Sobel_operator
+
+Want to use raw images... is that an image format? Could use ppm image format?
