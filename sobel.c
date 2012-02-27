@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-
+#include <string.h>
 
 #define PGM 0
 #define PPM 1
@@ -27,7 +27,6 @@ typedef struct
 typedef struct
 {
 	img_header header;
-	
 	bw_pixel** pixels_bw;
 } img_data;
 
@@ -38,6 +37,7 @@ int processData (FILE* inpFile, img_data* inImg);
 void outputImage(FILE* outFile, img_data* inImg);
 char skipSpaces(FILE* inpFile);
 void skipComment(FILE* inpFile);
+int getDimension(FILE* inpFile);
 int toGrayscale(int red, int green, int blue);
 
 int main(int argc, char* argv[])
@@ -47,26 +47,31 @@ int main(int argc, char* argv[])
 	img_data inImg;
 	img_data outImg;
 	int retVal;
+	char inFilename[100];
 	
+	//take optional command line args, output by default to "sobelOut.pgm"
+	if(argc < 2) //use a test image
+	{
+		strncpy(inFilename, "images/lena.pgm", 20);
+	}
+	else
+	{
+		strncpy(inFilename, argv[1], 100);
+		if(DEBUG)
+		{
+			printf("Using input file: %s.\n", inFilename);
+		}
+	}
 	
-	//TODO: change the way that input/output is handled
-	//take optional command line args, output by default to inputName_sobel
-	
-	//inpFile = fopen("images/lena.pgm", "r");
-	//inpFile = fopen("images/mona_lisa.pgm", "r");
-	//inpFile = fopen("images/lion.pgm", "r");
-	//inpFile = fopen("images/casablanca.pgm", "r");
-	//inpFile = fopen("images/coins.pgm", "r");
-	//inpFile = fopen("images/dewey_defeats_truman.pgm", "r");
-	inpFile = fopen("images/parrot_original.ppm", "r");
+	inpFile = fopen(inFilename, "r");
 	if(inpFile == NULL)
 	{
 		printf("Error opening input file.\n");
+		printf("Filename: %s.\n", inFilename);
 		return 1;
 	} 
 	
-	outFile = fopen("sobel_color_out.pgm", "w");
-	//outFile = fopen("sobel_parrot.ppm", "w");
+	outFile = fopen("SobelOut.pgm", "w");
 	if(outFile == NULL)
 	{
 		printf("Error opening output file.\n");
@@ -79,9 +84,7 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 	
-	//Allocate space for each image structure
 	allocateImageSpace(&inImg, &outImg);
-	
 	
 	retVal = processData(inpFile, &inImg);
 	if(retVal != 0)
@@ -90,10 +93,7 @@ int main(int argc, char* argv[])
 	}
 	
 	sobelFilter(&inImg, &outImg);
-	
-	//output image
 	outputImage(outFile, &outImg);
-	
 	
 	//TODO: free memory
 	return 0;
@@ -118,13 +118,11 @@ int sobelFilter(img_data* inImg, img_data* outImg)
 	height = inImg->header.height;
 	width = inImg->header.width;
 	
-	//Loop through the whole image
+	//Loop through the whole image pixel by pixel
 	for(row=0; row < height; row++)
 	{
 		for(col=0; col < width; col++)
-		{
-			//For each pixel in the image, do the following
-			
+		{	
 			//If it's an edge.
 			if((row==0) || (row==height-1) || (col==0) || (col==width-1))
 			{
@@ -155,7 +153,6 @@ int sobelFilter(img_data* inImg, img_data* outImg)
 						   (1 * inImg->pixels_bw[row+1][col+1].bw);
 				}
 				
-				
 				if(DEBUG)
 				{
 					//printf("Sum1: %d\n", sum1);
@@ -170,7 +167,6 @@ int sobelFilter(img_data* inImg, img_data* outImg)
 				{
 					sum2 = -sum2;
 				}
-				//TODO: add option to execute using power and square root, just for comparison
 				outImg->pixels_bw[row][col].bw = sum1 + sum2;
 				if(sum1 + sum2 > curMax)
 				{
@@ -196,20 +192,18 @@ int sobelFilter(img_data* inImg, img_data* outImg)
 	return 0;
 }
 
+//All images will be stored as black/white, so only one int per pixel of space is allocated.
 void allocateImageSpace(img_data* inImg, img_data* outImg)
 {
 	int row;
 	//Create the array of pixels for the input file
-	//Store all images as black/white
 	inImg->pixels_bw = (bw_pixel**)malloc(sizeof(bw_pixel*) * inImg->header.height);
 	for(row=0; row < inImg->header.height; row++)
 	{
-		//create each row
 		inImg->pixels_bw[row] = (bw_pixel*)malloc(sizeof(bw_pixel) * inImg->header.width);
 	}
 	
 	//Create the array of pixels for the output file
-	//The output file will always be black and white
 	outImg->header.type = PGM;
 	outImg->header.width = inImg->header.width;
 	outImg->header.height = inImg->header.height;
@@ -218,7 +212,6 @@ void allocateImageSpace(img_data* inImg, img_data* outImg)
 	outImg->pixels_bw = (bw_pixel**)malloc(sizeof(bw_pixel*) * outImg->header.height);
 	for(row=0; row < outImg->header.height; row++)
 	{
-		//create each row
 		outImg->pixels_bw[row] = (bw_pixel*)malloc(sizeof(bw_pixel) * outImg->header.width);
 	}
 }
@@ -228,7 +221,6 @@ int processHeader(FILE* inpFile, img_data* inImg)
 	char let1 = fgetc(inpFile);
 	char let2 = fgetc(inpFile);
 	char let3 = fgetc(inpFile);
-	char dimension[5];
 	
 	if(let1 != 'P')
 	{
@@ -262,47 +254,24 @@ int processHeader(FILE* inpFile, img_data* inImg)
 		return 1;
 	}
 	
-	
-	//TODO: fix these next parts so it supports any size
-	//For now assume it is 3 digits (Test with dewey_defeats_truman.pgm, 4 digit width)
-	dimension[0] = skipSpaces(inpFile);
-	dimension[1] = fgetc(inpFile);
-	dimension[2] = fgetc(inpFile);
-	dimension[3] ='\0';
-	inImg->header.width = atoi(dimension);
+	inImg->header.width = getDimension(inpFile);
+	inImg->header.height = getDimension(inpFile);
+	inImg->header.max_val = getDimension(inpFile);
 	if(DEBUG)
 	{
 		printf("Image Width: %d.\n", inImg->header.width);
-	}
-	
-	dimension[0] = skipSpaces(inpFile);
-	dimension[1] = fgetc(inpFile);
-	dimension[2] = fgetc(inpFile);
-	dimension[3] ='\0';
-	inImg->header.height = atoi(dimension);
-	if(DEBUG)
-	{
 		printf("Image Height: %d.\n", inImg->header.height);
-	}
-	
-	dimension[0] = skipSpaces(inpFile);
-	dimension[1] = fgetc(inpFile);
-	dimension[2] = fgetc(inpFile);
-	dimension[3] ='\0';
-	inImg->header.max_val = atoi(dimension);
-	if(DEBUG)
-	{
 		printf("Image Max Val: %d.\n", inImg->header.max_val);
 	}
-	
-	//Assume one space but fix this later
-	fgetc(inpFile);
-	
+	skipSpaces(inpFile);
+	fseek(inpFile, -1, SEEK_CUR);	//Go back one byte so we don't lose a byte
 	return 0;
 }
 
 int processData (FILE* inpFile, img_data* inImg)
 {
+	//For now this function doesn't do any error checking.
+	
 	int height;
 	int width;
 	int row;
@@ -310,8 +279,6 @@ int processData (FILE* inpFile, img_data* inImg)
 	int red;
 	int green;
 	int blue;
-	
-	//TODO: error checking. for now assume correct amount of data.
 	
 	height = inImg->header.height;
 	width = inImg->header.width;
@@ -326,7 +293,6 @@ int processData (FILE* inpFile, img_data* inImg)
 				red = fgetc(inpFile);
 				green = fgetc(inpFile);
 				blue = fgetc(inpFile);
-				
 				inImg->pixels_bw[row][col].bw = toGrayscale(red, green, blue);
 			}
 			else
@@ -336,13 +302,11 @@ int processData (FILE* inpFile, img_data* inImg)
 		}
 	}
 	
-	//Set the type to pgm since it is now a bw image.
-	inImg->header.type = PGM;
+	inImg->header.type = PGM;  //Set the type to pgm since it is now a bw image.
 	return 0;
 }
 
-//Output the image to the specified file
-//At this point only supports bw images.
+//Output the image to the specified file. Only supports bw images.
 void outputImage(FILE* outFile, img_data* inImg)
 {
 	int height;
@@ -379,11 +343,9 @@ void outputImage(FILE* outFile, img_data* inImg)
 	fputs(dimension, outFile);
 	fputc(10, outFile);
 	
-	
 	//data
 	height = inImg->header.height;
 	width = inImg->header.width;
-	
 	for(row=0; row < height; row++)
 	{
 		for(col=0; col < width; col++)
@@ -435,6 +397,35 @@ void skipComment(FILE* inpFile)
 			return;
 		}
 	}
+}
+
+int getDimension(FILE* inpFile)
+{
+	// '0' -> 48 (decimal)
+	// '9' -> 57 (decimal)
+	
+	char dimension[10];		//max of 10 digits
+	int nextChar;
+	int i;
+	
+	dimension[0] = skipSpaces(inpFile);	//Assume at least 1 digit is present
+	
+	for(i=1; i<10; i++)
+	{
+		nextChar = fgetc(inpFile);
+		if(nextChar < 48 || nextChar > 57)
+		{
+			dimension[i] = '\0';	//Explicitly set the last char to null terminator.
+			break;		//break if it's not a digit
+		}
+		else
+		{
+			dimension[i] = nextChar;
+		}
+	}
+
+	fseek(inpFile, -1, SEEK_CUR);	//Go back one byte so we don't lose a byte
+	return atoi(dimension);
 }
 
 int toGrayscale(int red, int green, int blue)
