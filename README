@@ -5,6 +5,7 @@ http://en.wikipedia.org/wiki/Sobel_operator
 
 Current Plan:
 1)Clean up software implementation (header file and library, simplify main method, etc.)
+	a)Store everything as a black/white image
 2)Add support for sizes more than 3 bytes, test on huge images?
 3)Add to wiki a section on the initial software implementation, include screenshot comparison with gimp sobel operator.
 4)Make optimizations to software (adders? shifts?)
