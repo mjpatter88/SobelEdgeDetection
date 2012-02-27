@@ -1,4 +1,5 @@
 //Will support both ppm and pgm format files, in both 1 byte and 2 byte format.
+//Converts every image to grayscale as it is read in.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,7 +10,6 @@
 
 #define DEBUG 1
 
-//TODO: Use unions instead of multiple struct options?
 typedef struct
 {
 	int type;
@@ -20,38 +20,15 @@ typedef struct
 
 typedef struct
 {
-	//char bw;
-	short bw;
-	//TODO: change this? need extra space for values over 255 during transformation
-	//Could we just use full ints for every pixel?
-} bw_pixel_1;
-
-typedef struct
-{
-	short bw;
-} bw_pixel_2;
-
-typedef struct
-{
-	char red;
-	char green;
-	char blue;
-} color_pixel_1;
-
-typedef struct
-{
-	short red;
-	short green;
-	short blue;
-} color_pixel_2;
+	//Use integers for extra space since values may overflow during transform
+	int bw;
+} bw_pixel;
 
 typedef struct
 {
 	img_header header;
-	//change this to use a union
-
-	bw_pixel_1** pixels_bw;
-	color_pixel_1 ** pixels_color;
+	
+	bw_pixel** pixels_bw;
 } img_data;
 
 int sobelFilter(img_data* inImg, img_data* outImg);
@@ -61,7 +38,7 @@ int processData (FILE* inpFile, img_data* inImg);
 void outputImage(FILE* outFile, img_data* inImg);
 char skipSpaces(FILE* inpFile);
 void skipComment(FILE* inpFile);
-int toGrayscale(color_pixel_1 pixel);
+int toGrayscale(int red, int green, int blue);
 
 int main(int argc, char* argv[])
 {
@@ -122,7 +99,7 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
-
+//Only supports black/white images
 int sobelFilter(img_data* inImg, img_data* outImg)
 {
 	int row;
@@ -155,25 +132,12 @@ int sobelFilter(img_data* inImg, img_data* outImg)
 			}
 			else
 			{
-				if(inImg->header.type == PPM)	//color images. convert to grayscale on the fly.
+				if(inImg->header.type == PPM)	//color images, should never happen
 				{
-					//TODO: change - to inverter, 2's to shifts, etc.
-					//TODO: can this be optimized? Better to first convert whole image to grayscale?
-					sum1 = (-1 * toGrayscale(inImg->pixels_color[row-1][col-1])) + 
-						   (1 * toGrayscale(inImg->pixels_color[row-1][col+1])) +
-						   (-2 * toGrayscale(inImg->pixels_color[row][col-1])) + 
-						   (2 * toGrayscale(inImg->pixels_color[row][col+1])) + 
-						   (-1 * toGrayscale(inImg->pixels_color[row+1][col-1])) + 
-						   (1 * toGrayscale(inImg->pixels_color[row+1][col+1]));
-			
-					sum2 = (-1 * toGrayscale(inImg->pixels_color[row-1][col-1])) + 
-						   (-2 * toGrayscale(inImg->pixels_color[row-1][col])) +
-						   (-1 * toGrayscale(inImg->pixels_color[row-1][col+1])) + 
-						   (1 * toGrayscale(inImg->pixels_color[row+1][col-1])) + 
-						   (2 * toGrayscale(inImg->pixels_color[row+1][col])) +
-						   (1 * toGrayscale(inImg->pixels_color[row+1][col+1]));
+					printf("This sobel filter function only supports black/white images.\n");
+					return 1;
 				}
-				else	//bw images
+				else	//bw images (All color images will have been converted to bw by now.)
 				{
 					//TODO: change - to inverter, 2's to shifts, etc.
 					sum1 = (-1 * inImg->pixels_bw[row-1][col-1].bw) + 
@@ -236,23 +200,12 @@ void allocateImageSpace(img_data* inImg, img_data* outImg)
 {
 	int row;
 	//Create the array of pixels for the input file
-	if(inImg->header.type == PPM)
+	//Store all images as black/white
+	inImg->pixels_bw = (bw_pixel**)malloc(sizeof(bw_pixel*) * inImg->header.height);
+	for(row=0; row < inImg->header.height; row++)
 	{
-		inImg->pixels_color = (color_pixel_1**)malloc(sizeof(color_pixel_1*) * inImg->header.height);
-		for(row=0; row < inImg->header.height; row++)
-		{
-			//create each row
-			inImg->pixels_color[row] = (color_pixel_1*)malloc(sizeof(color_pixel_1) * inImg->header.width);
-		}
-	}
-	else
-	{
-		inImg->pixels_bw = (bw_pixel_1**)malloc(sizeof(bw_pixel_1*) * inImg->header.height);
-		for(row=0; row < inImg->header.height; row++)
-		{
-			//create each row
-			inImg->pixels_bw[row] = (bw_pixel_1*)malloc(sizeof(bw_pixel_1) * inImg->header.width);
-		}
+		//create each row
+		inImg->pixels_bw[row] = (bw_pixel*)malloc(sizeof(bw_pixel) * inImg->header.width);
 	}
 	
 	//Create the array of pixels for the output file
@@ -262,11 +215,11 @@ void allocateImageSpace(img_data* inImg, img_data* outImg)
 	outImg->header.height = inImg->header.height;
 	outImg->header.max_val = inImg->header.max_val;
 	
-	outImg->pixels_bw = (bw_pixel_1**)malloc(sizeof(bw_pixel_1*) * outImg->header.height);
+	outImg->pixels_bw = (bw_pixel**)malloc(sizeof(bw_pixel*) * outImg->header.height);
 	for(row=0; row < outImg->header.height; row++)
 	{
 		//create each row
-		outImg->pixels_bw[row] = (bw_pixel_1*)malloc(sizeof(bw_pixel_1) * outImg->header.width);
+		outImg->pixels_bw[row] = (bw_pixel*)malloc(sizeof(bw_pixel) * outImg->header.width);
 	}
 }
 
@@ -354,6 +307,9 @@ int processData (FILE* inpFile, img_data* inImg)
 	int width;
 	int row;
 	int col;
+	int red;
+	int green;
+	int blue;
 	
 	//TODO: error checking. for now assume correct amount of data.
 	
@@ -366,9 +322,12 @@ int processData (FILE* inpFile, img_data* inImg)
 		{
 			if(inImg->header.type == PPM)
 			{
-				inImg->pixels_color[row][col].red = fgetc(inpFile);
-				inImg->pixels_color[row][col].green = fgetc(inpFile);
-				inImg->pixels_color[row][col].blue = fgetc(inpFile);	
+				//convert to grayscale as values are read in.
+				red = fgetc(inpFile);
+				green = fgetc(inpFile);
+				blue = fgetc(inpFile);
+				
+				inImg->pixels_bw[row][col].bw = toGrayscale(red, green, blue);
 			}
 			else
 			{
@@ -376,10 +335,14 @@ int processData (FILE* inpFile, img_data* inImg)
 			}
 		}
 	}
+	
+	//Set the type to pgm since it is now a bw image.
+	inImg->header.type = PGM;
 	return 0;
 }
 
 //Output the image to the specified file
+//At this point only supports bw images.
 void outputImage(FILE* outFile, img_data* inImg)
 {
 	int height;
@@ -397,9 +360,8 @@ void outputImage(FILE* outFile, img_data* inImg)
 	}
 	else
 	{
-		fputc('P', outFile);
-		fputc('6', outFile);
-		fputc(10, outFile);	
+		printf("Color images not supported by this \"output image\" function.\n");
+		return;
 	}
 	
 	//width + newLine
@@ -426,16 +388,8 @@ void outputImage(FILE* outFile, img_data* inImg)
 	{
 		for(col=0; col < width; col++)
 		{
-			if(inImg->header.type == PPM)
-			{
-				fputc(inImg->pixels_color[row][col].red, outFile);
-				fputc(inImg->pixels_color[row][col].green, outFile);
-				fputc(inImg->pixels_color[row][col].blue, outFile);	
-			}
-			else
-			{
-				fputc(inImg->pixels_bw[row][col].bw, outFile);
-			}
+			//Must be a bw image by this point.
+			fputc(inImg->pixels_bw[row][col].bw, outFile);
 		}
 	}
 }
@@ -483,8 +437,8 @@ void skipComment(FILE* inpFile)
 	}
 }
 
-int toGrayscale(color_pixel_1 pixel)
+int toGrayscale(int red, int green, int blue)
 {
 	//TODO: Can this be optimized at all?  Any way to avoid multiplication?
-	return (0.3*pixel.red) + (0.59*pixel.green) + (0.11*pixel.blue);
+	return (0.3*red) + (0.59*green) + (0.11*blue);
 }
