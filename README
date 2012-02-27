@@ -3,4 +3,13 @@ An implementation in C of the Sobel edge detection operator on image files.  Wri
 Start with this link:
 http://en.wikipedia.org/wiki/Sobel_operator
 
-Want to use raw images... is that an image format? Could use ppm image format?
+Current Plan:
+1)Clean up software implementation (header file and library, simplify main method, etc.)
+2)Add support for sizes more than 3 bytes, test on huge images?
+3)Add to wiki a section on the initial software implementation, include screenshot comparison with gimp sobel operator.
+4)Make optimizations to software (adders? shifts?)
+5)Add to wiki a section on the optimizations with screenshots showing functionality
+
+6)Profile software and add to wiki
+7)Start a software implementation
+8)Hardware implementation
