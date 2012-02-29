@@ -137,7 +137,23 @@ int sobelFilter(img_data* inImg, img_data* outImg)
 				}
 				else	//bw images (All color images will have been converted to bw by now.)
 				{
-					//TODO: change - to inverter, 2's to shifts, etc.
+					//Optimized way with no multiplication
+					sum1 = (-inImg->pixels_bw[row-1][col-1].bw) + 
+						   (inImg->pixels_bw[row-1][col+1].bw) +
+						   (-inImg->pixels_bw[row][col-1].bw - inImg->pixels_bw[row][col-1].bw) + 
+						   (inImg->pixels_bw[row][col+1].bw + inImg->pixels_bw[row][col+1].bw) + 
+						   (-inImg->pixels_bw[row+1][col-1].bw) + 
+						   (inImg->pixels_bw[row+1][col+1].bw);
+			
+					sum2 = (-inImg->pixels_bw[row-1][col-1].bw) + 
+						   (-inImg->pixels_bw[row-1][col].bw - inImg->pixels_bw[row-1][col].bw) +
+						   (-inImg->pixels_bw[row-1][col+1].bw) + 
+						   (inImg->pixels_bw[row+1][col-1].bw) + 
+						   (inImg->pixels_bw[row+1][col].bw + inImg->pixels_bw[row+1][col].bw) +
+						   (inImg->pixels_bw[row+1][col+1].bw);
+					
+					//Non-optimized method
+					/*
 					sum1 = (-1 * inImg->pixels_bw[row-1][col-1].bw) + 
 						   (1 * inImg->pixels_bw[row-1][col+1].bw) +
 						   (-2 * inImg->pixels_bw[row][col-1].bw) + 
@@ -151,6 +167,7 @@ int sobelFilter(img_data* inImg, img_data* outImg)
 						   (1 * inImg->pixels_bw[row+1][col-1].bw) + 
 						   (2 * inImg->pixels_bw[row+1][col].bw) +
 						   (1 * inImg->pixels_bw[row+1][col+1].bw);
+					*/
 				}
 				
 				if(DEBUG)
