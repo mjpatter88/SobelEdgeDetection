@@ -3,14 +3,12 @@ An implementation in C of the Sobel edge detection operator on image files.  Wri
 Start with this link:
 http://en.wikipedia.org/wiki/Sobel_operator
 
-Current Plan:
-2)Add support for sizes more than 3 bytes, test on huge images?
-3)Check all TODO's in the file.
-4)Add to wiki a section on the initial software implementation, include screenshot comparison with gimp sobel operator.
-5)Email group
-6)Make optimizations to software (adders? shifts?)
-7)Add to wiki a section on the optimizations with screenshots showing functionality
+Software model
+1)Duplicate folder structure and list which files need to be modified
 
-8)Profile software and add to wiki
-9)Start a software implementation
-10)Hardware implementation
+.c file
+.cpp software sim file
+makefile
+.s assembly file
+
+Hardware implementation
